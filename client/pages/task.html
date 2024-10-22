@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NOTED - To-Do List with Progress Pie Chart</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="../css/task.css" />
+</head>
+<body>
+    <header class="sticky-header">
+        NOTED
+    </header>
+    <main>
+        <div class="todo-container">
+            <h2>TO-DO LIST</h2>
+            <input type="text" id="todo-input" placeholder="Add a new task...">
+            <button onclick="addTask()">Add Task</button>
+            <ul id="todo-list"></ul>
+        </div>
+        <div class="chart-container">
+            <h2>PIE CHART</h2>
+            <canvas id="progress-chart" width="300" height="300"></canvas>
+        </div>
+    </main>
+
+    <!-- Calendar Section -->
+    <div class="container-calendar">
+        <h2>My Reminders</h2>
+        <div id="calendar">
+            <h2 id="monthAndYear"></h2>
+            <div class="button-container-calendar">
+                <button id="previous" onclick="previous()">&#10094;</button>
+                <button id="next" onclick="next()">&#10095;</button>
+            </div>
+            <table class="table-calendar">
+                <thead id="thead-month"></thead>
+                <tbody id="calendar-body"></tbody>
+            </table>
+            <div class="footer-container-calendar">
+                <select id="month" onchange="jump()"></select>
+                <select id="year" onchange="jump()"></select>
+            </div>
+        </div>
+        <div id="event-section">
+            <h3>Add Event</h3>
+            <input type="date" id="event-date" />
+            <input type="text" id="event-title" placeholder="Event Title" />
+            <input type="text" id="event-description" placeholder="Event Description" />
+            <button onclick="addEvent()">Add Event</button>
+            <h3>Upcoming Events</h3>
+            <ul id="reminderList"></ul>
+        </div>
+    </div>
+
+    <script>
+        const userId = localStorage.getItem("userId");
+        const taskList = [];
+
+        // Initialize Chart
+        const chartData = {
+            labels: ['Completed', 'Remaining'],
+            datasets: [{
+                data: [0, 1],
+                backgroundColor: ['#28a745', '#dc3545'],
+            }]
+        };
+
+        const ctx = document.getElementById('progress-chart').getContext('2d');
+        const progressChart = new Chart(ctx, {
+            type: 'pie',
+            data: chartData,
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: { display: true, position: 'top' },
+                    tooltip: {
+                        callbacks: {
+                            label: function(tooltipItem) {
+                                return tooltipItem.label + ': ' + tooltipItem.raw;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        function fetchTasks() {
+            fetch(`/api/tasks/user/${userId}/tasks`)
+                .then(response => response.json())
+                .then(data => {
+                    taskList.length = 0;
+                    data.forEach(task => {
+                        taskList.push({ id: task.id, text: task.task_description, completed: task.status === 'Completed' });
+                    });
+                    renderTasks();
+                    updateChart();
+                })
+                .catch(error => console.error("Error fetching tasks:", error));
+        }
+
+        function renderTasks() {
+            const todoListElement = document.getElementById('todo-list');
+            todoListElement.innerHTML = '';
+
+            taskList.forEach(task => {
+                const li = document.createElement('li');
+                li.classList.toggle('completed', task.completed);
+
+                const checkbox = document.createElement('div');
+                checkbox.className = 'checkbox';
+                checkbox.classList.toggle('checked', task.completed);
+                checkbox.onclick = function() {
+                    updateTaskStatus(task.id, !task.completed);
+                };
+
+                const taskLabel = document.createElement('span');
+                taskLabel.textContent = task.text;
+
+                const removeButton = document.createElement('button');
+                removeButton.textContent = 'Remove';
+                removeButton.className = 'remove';
+                removeButton.onclick = function() {
+                    deleteTask(task.id);
+                };
+
+                li.appendChild(checkbox);
+                li.appendChild(taskLabel);
+                li.appendChild(removeButton);
+                todoListElement.appendChild(li);
+            });
+        }
+
+        function deleteTask(taskId) {
+            if (taskId) {
+                fetch(`/api/tasks/${taskId}`, {
+                    method: 'DELETE'
+                })
+                .then(response => {
+                    if (response.ok) {
+                        console.log("Task deleted successfully");
+                        location.reload(); // Automatic refresh after deletion
+                    } else {
+                        console.error("Error deleting task:", response.statusText);
+                    }
+                })
+                .catch(error => console.error("Error deleting task:", error));
+            } else {
+                console.error("Cannot delete task: ID is undefined.");
+            }
+        }
+
+        function addTask() {
+            const taskDescription = document.getElementById('todo-input').value.trim();
+
+            if (taskDescription) {
+                fetch('/api/tasks/user/tasks', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ userId, taskDescription })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    console.log("Task added successfully", data);
+                    document.getElementById('todo-input').value = ''; // Clear input
+                    location.reload(); // Automatic refresh after adding
+                })
+                .catch(error => console.error("Error adding task:", error));
+            } else {
+                alert("Please enter a task!");
+            }
+        }
+
+        function updateTaskStatus(taskId, completed) {
+            if (taskId) {
+                fetch(`/api/tasks/${taskId}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status: completed ? 'Completed' : 'Pending' })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    console.log("Task updated successfully", data);
+                    location.reload(); // Automatic refresh after status update
+                })
+                .catch(error => console.error("Error updating task:", error));
+            } else {
+                console.error("Cannot update task status: ID is undefined.");
+            }
+        }
+
+        function updateChart() {
+            const completedTasks = taskList.filter(task => task.completed).length;
+            const remainingTasks = taskList.length - completedTasks;
+            progressChart.data.datasets[0].data = [completedTasks, remainingTasks];
+            progressChart.update();
+        }
+
+        // Calendar functionality
+        let currentDate = new Date();
+        let currentYear = currentDate.getFullYear();
+        let currentMonth = currentDate.getMonth();
+        let events = [];
+
+        const monthNames = ["January", "February", "March", "April", "May", "June", 
+                          "July", "August", "September", "October", "November", "December"];
+
+        function showCalendar(month, year) {
+            let firstDay = new Date(year, month).getDay();
+            let daysInMonth = new Date(year, month + 1, 0).getDate();
+            let tableBody = document.getElementById("calendar-body");
+            tableBody.innerHTML = "";
+            document.getElementById("monthAndYear").innerHTML = monthNames[month] + " " + year;
+            document.getElementById("thead-month").innerHTML = "<tr><th>Sun</th><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th></tr>";
+
+            let row = document.createElement("tr");
+            for (let i = 0; i < firstDay; i++) {
+                let cell = document.createElement("td");
+                row.appendChild(cell);
+            }
+
+            for (let day = 1; day <= daysInMonth; day++) {
+                let cell = document.createElement("td");
+                cell.textContent = day;
+                cell.classList.add("date-picker");
+
+                let eventForDay = events.find(event => event.date === `${year}-${(month + 1).toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`);
+                if (eventForDay) {
+                    cell.classList.add("event");
+                    cell.title = `${eventForDay.title}: ${eventForDay.description}`;
+                }
+
+                row.appendChild(cell);
+                if ((day + firstDay) % 7 === 0) {
+                    tableBody.appendChild(row);
+                    row = document.createElement("tr");
+                }
+            }
+            tableBody.appendChild(row);
+        }
+
+        function next() {
+            currentMonth = currentMonth === 11 ? 0 : currentMonth + 1;
+            currentYear = currentMonth === 0 ? currentYear + 1 : currentYear;
+            showCalendar(currentMonth, currentYear);
+        }
+
+        function previous() {
+            currentMonth = currentMonth === 0 ? 11 : currentMonth - 1;
+            currentYear = currentMonth === 11 ? currentYear - 1 : currentYear;
+            showCalendar(currentMonth, currentYear);
+        }
+
+        function jump() {
+            currentYear = parseInt(document.getElementById("year").value);
+            currentMonth = parseInt(document.getElementById("month").value);
+            showCalendar(currentMonth, currentYear);
+        }
+
+        function addEvent() {
+            const eventDate = document.getElementById("event-date").value;
+            const eventTitle = document.getElementById("event-title").value;
+            const eventDescription = document.getElementById("event-description").value;
+
+            if (eventDate && eventTitle && eventDescription) {
+                events.push({ date: eventDate, title: eventTitle, description: eventDescription });
+                document.getElementById("reminderList").innerHTML += 
+                    `<li><strong>${eventDate}</strong>: ${eventTitle} - ${eventDescription}</li>`;
+                
+                // Clear inputs
+                document.getElementById("event-date").value = "";
+                document.getElementById("event-title").value = "";
+                document.getElementById("event-description").value = "";
+                
+                showCalendar(currentMonth, currentYear);
+            } else {
+                alert("Please fill out all fields.");
+            }
+        }
+
+        // Initialize calendar month/year dropdowns
+        function initializeCalendar() {
+            let monthSelect = document.getElementById("month");
+            let yearSelect = document.getElementById("year");
+
+            for (let i = 0; i < 12; i++) {
+                let option = document.createElement("option");
+                option.value = i;
+                option.text = monthNames[i];
+                monthSelect.appendChild(option);
+            }
+
+            const yearRange = 5;
+            for (let i = currentYear - yearRange; i <= currentYear + yearRange; i++) {
+                let option = document.createElement("option");
+                option.value = i;
+                option.text = i;
+                yearSelect.appendChild(option);
+            }
+
+            monthSelect.value = currentMonth;
+            yearSelect.value = currentYear;
+        }
+
+        // Event listeners
+        document.getElementById('todo-input').addEventListener('keypress', function(event) {
+            if (event.key === 'Enter') {
+                addTask();
+            }
+        });
+
+        // Initialize everything
+        initializeCalendar();
+        showCalendar(currentMonth, currentYear);
+        fetchTasks();
+    </script>
+</body>
+</html>

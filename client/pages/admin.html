@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - User Progress</title>
+    <link rel="stylesheet" href="../css/admin.css" />
+</head>
+<body>
+    <div class="dashboard">
+        <div class="header">
+            <h1>Admin Dashboard</h1>
+            <button onclick="toggleTaskForm()">New Task</button>
+        </div>
+
+        <div class="users-progress" id="usersProgress">
+            <!-- User progress cards will be added here -->
+        </div>
+
+        <div class="task-form" id="taskForm" style="display: none;">
+            <h2>Assign New Task</h2>
+            <form onsubmit="addTask(event)">
+                <div class="form-group">
+                    <label for="taskTitle">Task Title</label>
+                    <input type="text" id="taskTitle" required>
+                </div>
+                <div class="form-group">
+                    <label for="assignee">Assign To</label>
+                    <select id="assignee" required>
+                        <option value="">Select User</option>
+                        <option value="shravani">Shravani Katre</option>
+                        <option value="shubhika">Shubhika Maheshwari</option>
+                        <option value="shreya">Shreya Kalambe</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="description">Description</label>
+                    <textarea id="description" required></textarea>
+                </div>
+                <button type="submit">Assign Task</button>
+            </form>
+        </div>
+
+        <div class="tasks-header">
+            <h2>Tasks</h2>
+            <div class="filter-buttons">
+                <button class="filter-btn active" onclick="filterTasks('all')">All</button>
+                <button class="filter-btn" onclick="filterTasks('shravani')">Shravani</button>
+                <button class="filter-btn" onclick="filterTasks('shubhika')">Shubhika</button>
+                <button class="filter-btn" onclick="filterTasks('shreya')">Shreya</button>
+            </div>
+        </div>
+
+        <div class="tasks-list" id="tasksList">
+            <!-- Tasks will be added here dynamically -->
+        </div>
+    </div>
+
+    <script>
+        // User data structure
+        const users = {
+            shravani: { name: 'Shravani Katre', tasks: [], completed: 0, total: 0 },
+            shubhika: { name: 'Shubhika Maheshwari', tasks: [], completed: 0, total: 0 },
+            shreya: { name: 'Shreya Kalambe', tasks: [], completed: 0, total: 0 }
+        };
+
+        // Initialize user progress cards
+        function initializeUserCards() {
+            const progressSection = document.getElementById('usersProgress');
+            for (const [userId, user] of Object.entries(users)) {
+                const card = document.createElement('div');
+                card.className = 'user-card';
+                card.innerHTML = `
+                    <div class="user-info">
+                        <div class="user-avatar">${user.name.charAt(0)}</div>
+                        <div class="user-details">
+                            <h3>${user.name}</h3>
+                            <div class="user-stats">
+                                <span id="${userId}-completed">0</span> completed of 
+                                <span id="${userId}-total">0</span> tasks
+                            </div>
+                        </div>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress progress-${userId}" id="${userId}-progress" style="width: 0%"></div>
+                    </div>
+                `;
+                progressSection.appendChild(card);
+            }
+        }
+
+        // Update user progress
+        function updateUserProgress(userId) {
+            const user = users[userId];
+            const completed = user.tasks.filter(task => task.status === 'completed').length;
+            const total = user.tasks.length;
+            const progress = total === 0 ? 0 : (completed / total) * 100;
+
+            document.getElementById(`${userId}-completed`).textContent = completed;
+            document.getElementById(`${userId}-total`).textContent = total;
+            document.getElementById(`${userId}-progress`).style.width = `${progress}%`;
+        }
+
+        // Toggle task form visibility
+        function toggleTaskForm() {
+            const form = document.getElementById('taskForm');
+            form.style.display = form.style.display === 'none' ? 'block' : 'none';
+        }
+
+        // Add new task
+        function addTask(event) {
+            event.preventDefault();
+            
+            const title = document.getElementById('taskTitle').value;
+            const assignee = document.getElementById('assignee').value;
+            const description = document.getElementById('description').value;
+            
+            const task = {
+                id: Date.now(),
+                title,
+                assignee,
+                description,
+                status: 'pending',
+                date: new Date().toLocaleDateString()
+            };
+
+            users[assignee].tasks.push(task);
+            updateUserProgress(assignee);
+            renderTasks();
+            
+            event.target.reset();
+            toggleTaskForm();
+        }
+
+        // Update task status
+        function updateTaskStatus(taskId, newStatus) {
+            for (const user of Object.values(users)) {
+                const task = user.tasks.find(t => t.id === taskId);
+                if (task) {
+                    task.status = newStatus;
+                    updateUserProgress(task.assignee);
+                    renderTasks();
+                    break;
+                }
+            }
+        }
+
+        // Filter tasks
+        let currentFilter = 'all';
+        function filterTasks(filter) {
+            currentFilter = filter;
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            renderTasks();
+        }
+
+        // Render tasks
+        function renderTasks() {
+            const tasksList = document.getElementById('tasksList');
+            tasksList.innerHTML = '';
+
+            let filteredTasks = [];
+            for (const [userId, user] of Object.entries(users)) {
+                if (currentFilter === 'all' || currentFilter === userId) {
+                    filteredTasks.push(...user.tasks);
+                }
+            }
+
+            filteredTasks.sort((a, b) => b.id - a.id); // Sort by newest first
+
+            filteredTasks.forEach(task => {
+                const taskElement = document.createElement('div');
+                taskElement.className = 'task-item';
+                taskElement.innerHTML = `
+                    <div class="task-info">
+                        <div class="task-title">${task.title}</div>
+                        <div class="task-meta">
+                            Assigned to: ${users[task.assignee].name} | ${task.date}
+                        </div>
+                    </div>
+                    <div>
+                        <select onchange="updateTaskStatus(${task.id}, this.value)">
+                            <option value="pending" ${task.status === 'pending' ? 'selected' : ''}>Pending</option>
+                            <option value="in-progress" ${task.status === 'in-progress' ? 'selected' : ''}>In Progress</option>
+                            <option value="completed" ${task.status === 'completed' ? 'selected' : ''}>Completed</option>
+                        </select>
+                        <span class="status-badge status-${task.status}">
+                            ${task.status.charAt(0).toUpperCase() + task.status.slice(1)}
+                        </span>
+                    </div>
+                `;
+                tasksList.appendChild(taskElement);
+            });
+        }
+
+        // Initialize with sample data
+        window.onload = function() {
+            initializeUserCards();
+
+            // Add sample tasks
+            const sampleTasks = [
+                { id: 1, title: 'Review Q3 Reports', assignee: 'shravani', description: 'Review and analyze Q3 performance reports', status: 'in-progress', date: '2024-10-21' },
+                { id: 2, title: 'Update User Documentation', assignee: 'shubhika', description: 'Update the user guide with new features', status: 'completed', date: '2024-10-21' },
+                { id: 3, title: 'Prepare Client Presentation', assignee: 'shreya', description: 'Create presentation for client meeting', status: 'pending', date: '2024-10-21' },
+                { id: 4, title: 'Code Review', assignee: 'shubhika', description: 'Review pull requests', status: 'in-progress', date: '2024-10-21' }
+            ];
+
+            sampleTasks.forEach(task => {
+                users[task.assignee].tasks.push(task);
+                updateUserProgress(task.assignee);
+            });
+
+            renderTasks();
+        }
+    </script>
+</body>
+</html>
