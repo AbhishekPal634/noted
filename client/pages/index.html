@@ -1,15 +1,22 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Noted. - Your Digital Productivity Companion</title>
     <link rel="stylesheet" href="../css/index.css" />
 </head>
+
 <body>
     <header>
         <nav class="container">
             <a href="#" class="logo">Noted.</a>
+            <button class="hamburger">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
             <ul class="nav-links">
                 <li><a href="#home">Home</a></li>
                 <li><a href="#features">Features</a></li>
@@ -53,7 +60,8 @@
                     </div>
                     <div>
                         <h3>Our Vision</h3>
-                        <p>We envision a world where productivity is effortless and everyone can achieve their goals.</p>
+                        <p>We envision a world where productivity is effortless and everyone can achieve their goals.
+                        </p>
                     </div>
                     <div>
                         <h3>Our Team</h3>
@@ -67,5 +75,29 @@
             </div>
         </section>
     </main>
+    <script>
+        const hamburger = document.querySelector('.hamburger');
+        const navLinks = document.querySelector('.nav-links');
+
+        hamburger.addEventListener('click', () => {
+            hamburger.classList.toggle('active');
+            navLinks.classList.toggle('active');
+        });
+
+        document.querySelectorAll('.nav-links a').forEach(link => {
+            link.addEventListener('click', () => {
+                hamburger.classList.remove('active');
+                navLinks.classList.remove('active');
+            });
+        });
+
+        document.addEventListener('click', (e) => {
+            if (!hamburger.contains(e.target) && !navLinks.contains(e.target)) {
+                hamburger.classList.remove('active');
+                navLinks.classList.remove('active');
+            }
+        });
+    </script>
 </body>
+
 </html>
