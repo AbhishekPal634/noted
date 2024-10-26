@@ -4,13 +4,13 @@ const cors = require("cors");
 const authRoutes = require("./routes/authRoutes");
 const taskRoutes = require("./routes/taskRoutes");
 const axios = require("axios");
+const db = require("./db");
 
 const app = express();
 const PORT = 8800;
 
 app.use(cors());
 app.use(express.json());
-
 app.use(express.static(path.join(__dirname, "../client")));
 
 app.get("/", (req, res) => {
@@ -47,6 +47,19 @@ function reloadWebsite() {
 
 setInterval(reloadWebsite, interval);
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
+});
+
+process.on("SIGINT", () => {
+  db.end((err) => {
+    if (err) {
+      console.error("Error closing the pool:", err);
+    }
+    console.log("Database pool closed.");
+    server.close(() => {
+      console.log("Server closed.");
+      process.exit(0);
+    });
+  });
 });
